@@ -1,0 +1,126 @@
+Complex Dax Formulas like :
+COGS Dynamic = 
+IF (
+    HASONEVALUE ( 'Dim_Date'[Month Short] ),
+    [MOM COGS Growth Rate],
+    IF (
+        ISFILTERED ( 'Dim_Date'[Year] ),
+        [YOY COGS Growth Rate],
+        BLANK()
+    )
+)
+----------------------------------------
+  Dispersion Ratio = 
+DIVIDE(
+    STDEV.P(Fact_Sales[Discount]), 
+    AVERAGE(Fact_Sales[Discount]), 
+    0
+)
+----------------------------------------
+  Returned Product Filter = 
+VAR HasReturns = 
+    CALCULATE(
+        COUNTROWS(Fact_Sales),
+        Fact_Sales[Quantity] < 0
+    )
+RETURN
+    IF(HasReturns > 0, 1, 0)
+  --------------------------------------
+  Sales Inventory Deviations = sum(Fact_InventoryBalance[Sales]) - sum(Fact_Sales[Quantity])
+  --------------------------------------
+  Selling Deviations = 
+DIVIDE(
+    SUM(Fact_Sales[Sales Value]) - [Sales Target],
+    [Sales Target],
+    0
+)
+  --------------------------------------
+  Selling Price Deviation % = 
+VAR Weighted_Retail_Price = 
+    DIVIDE(
+        SUMX(Fact_Purchases, Fact_Purchases[Retail_Price] * Fact_Purchases[Quantity]), 
+        SUM(Fact_Purchases[Quantity]), 
+        BLANK()
+    )
+VAR Weighted_Sales_Price = 
+    DIVIDE(
+        SUMX(Fact_Sales, Fact_Sales[Price] * Fact_Sales[Quantity]), 
+        SUM(Fact_Sales[Quantity]), 
+        BLANK()
+    )
+RETURN
+    DIVIDE(
+        Weighted_Sales_Price - Weighted_Retail_Price,
+        Weighted_Retail_Price,
+        BLANK()
+    )
+  ---------------------------------------
+  Unsold Product Filter = 
+VAR SalesQty = SUM(Fact_Sales[Quantity])
+RETURN
+    IF(ISBLANK(SalesQty) || SalesQty = 0, 1, 0)
+  ---------------------------------------
+  Dynamic Discount Value IF color = 
+IF (
+    HASONEVALUE('Dim_Date'[Month Short] ),
+    [Discount MOM IF],
+    IF (
+        HASONEVALUE ( 'Dim_Date'[Year] ),
+        [Discount YOY IF],
+        BLANK ()
+    )
+)
+  --------------------------------------
+  COGS = 
+SUMX(
+    Fact_Sales,
+    Fact_Sales[Quantity] * 
+    CALCULATE(
+        [Avg Cost],
+        REMOVEFILTERS(Dim_Date)
+    )
+)
+  -------------------------------------
+  Gross Profit = SUM(Fact_Sales[Sales Value])- [COGS]
+  -------------------------------------
+  Invoices YOY IF = IF(SUM(Fact_Sales[Invoice_ID]) > [YOY Invoices],1,0)
+  -------------------------------------
+  Sales Target = [MOM Sales]*1.1
+  -------------------------------------
+  Weighted Retail Price = 
+    DIVIDE(
+        SUMX(Fact_Purchases, Fact_Purchases[Retail_Price] * Fact_Purchases[Quantity]), 
+        SUM(Fact_Purchases[Quantity]), 
+        BLANK()
+    )
+  -------------------------------------
+  Weighted Selling Price = 
+    DIVIDE(
+        SUMX(Fact_Sales, Fact_Sales[Price] * Fact_Sales[Quantity]), 
+        SUM(Fact_Sales[Quantity]), 
+        BLANK()
+    )
+  --------------------------------------
+  MOM Quantity Growth Rate = DIVIDE(SUM(Fact_Sales[Quantity]) - [MOM Quantity] , [MOM Quantity])
+  --------------------------------------
+  YOY Invoices = CALCULATE(DISTINCTCOUNT(Fact_Sales[Invoice_ID]),SAMEPERIODLASTYEAR(Dim_Date[Date]))
+  --------------------------------------
+  Latest Supplier Balance = 
+VAR MaxDate = MAX(Fact_Suppliers_Acc[date])
+VAR MaxDoc = 
+    CALCULATE(
+        MAX(Fact_Suppliers_Acc[doc_number]),
+        Fact_Suppliers_Acc[date] = MaxDate
+    )
+RETURN
+    CALCULATE(
+        SELECTEDVALUE(Fact_Suppliers_Acc[balance]),
+        Fact_Suppliers_Acc[date] = MaxDate,
+        Fact_Suppliers_Acc[doc_number] = MaxDoc
+    )
+  --------------------------------------
+  Avg Cost = 
+DIVIDE(
+    SUMX(Fact_Purchases, (Fact_Purchases[Buy_Price] * Fact_Purchases[Quantity]) - Fact_Purchases[Discount]),
+    SUM(Fact_Purchases[Quantity])
+)
